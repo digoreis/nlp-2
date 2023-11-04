@@ -1,6 +1,17 @@
 import sys
 import os
-from nltk import FreqDist, word_tokenize, ngrams
+import re
+import string
+import nltk
+from nltk import FreqDist
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import logging
+
+logging.getLogger('nltk').setLevel(logging.ERROR)
+
+nltk.download('stopwords')
+nltk.download('punkt')
 
 
 def extract_tag_name(string):
@@ -113,7 +124,26 @@ def load_questions(file):
         lines = [line.replace("\t" , " ") for line in lines]
         return lines
         
-        
+def pre_process(text):
+    remove_words = list(set(string.punctuation))
+    remove_words.extend(stopwords.words())
+    remove_words.extend(set("`'"))
+    remove_words.extend(["``", "''"])
+
+    words_question = word_tokenize(question)
+
+    processed_tokens = []
+    for token in words_question:
+        ntoken = token.lower()
+        if ntoken in remove_words:
+            continue
+        if re.match(r'^\d{4}$', ntoken):
+            processed_tokens.append('_YEAR_')
+        else:
+            processed_tokens.append(ntoken)
+    return ' '.join(processed_tokens)
+
+
 if len(sys.argv) < 4:
     print("Uso: python lmclassifier.py algorithm folder_unigrams_bigrams file_questions.txt")
     exit(1)
@@ -121,20 +151,29 @@ if len(sys.argv) < 4:
 algorithm = sys.argv[1]
 folder_counts = sys.argv[2]
 file = sys.argv[3]
+is_preprocess = False
+if folder_counts == "counts2":
+    is_preprocess = True
 
 questions = load_questions(file)
 
 if algorithm == "unigram":
     unigrams = load_unigrams(folder_counts)
     for question in questions:
+        if is_preprocess:
+            question = pre_process(question)
         print(unigram_tag(unigrams, question))
 elif algorithm == "bigram":
     bigrams = load_bigrams(folder_counts)
     for question in questions:
+        if is_preprocess:
+            question = pre_process(question)
         print(bigram_tag(bigrams, question))
 elif algorithm == "smooth":
     bigrams = load_bigrams(folder_counts)
     for question in questions:
+        if is_preprocess:
+            question = pre_process(question)
         print(bigram_smooth_tag(bigrams, question))
 else:
     print("Invalid algorithm")
